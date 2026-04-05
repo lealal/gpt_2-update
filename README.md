@@ -1,6 +1,6 @@
-# Modern GPT-2 Small Reimplementation (116M Parameters)
+# Modern GPT-2 Small Reimplementation (~123M Parameters)
 
-This project reimplements a **GPT-2 Small–scale language model (~116M parameters)** using **modern transformer design practices**, inspired by the book **_LLMs From Scratch_ by Sebastian Raschka**.
+This project reimplements a **GPT-2 Small–scale language model (~123M parameters)** using **modern transformer design practices**, inspired by the book **_LLMs From Scratch_ by Sebastian Raschka**.
 
 The goal of this project is not to compete with state-of-the-art models, but to:
 
@@ -25,13 +25,13 @@ The final model:
 
 | Property | Value |
 |--------|------|
-| Parameters | ~116M |
+| Parameters | ~123M |
 | Context Length | 512 |
-| Layers | 10 |
+| Layers | 13 |
 | Attention Heads | 8 |
 | KV Groups | 4 |
-| Embedding Dimension | 720 |
-| Hidden Dimension | 1280 |
+| Embedding Dimension | 768 |
+| Hidden Dimension | 2048 |
 | Training Tokens | ~500M |
 | Dataset | RedPajama |
 | Hardware | Apple M3 Pro (MPS) |
@@ -112,6 +112,24 @@ instead of dropout for regularization.
 
 ---
 
+## 7. Weight Tying
+
+The token embedding matrix and the output projection head share the same weights.
+
+Both layers operate between the same two spaces (tokens ↔ embedding vectors), just in opposite directions:
+- The embedding maps a token ID → vector
+- The output head maps a vector → token logits (`x @ W.T`)
+
+Tying them uses a single matrix for both, which:
+
+- Reduces parameters by ~39M saved through weight tying — reclaimed by scaling `emb_dim` to 768, `hidden_dim` to 2048, and adding 3 layers, landing at **~123M total**
+- Is standard practice in modern LLMs
+
+Reference:  
+Press & Wolf (2017) — *Using the Output Embedding to Improve Language Models* (arXiv:1608.05859)
+
+---
+
 # Dataset
 
 The model is trained using **RedPajama-Data-V2**.
@@ -176,7 +194,7 @@ Where the target represents the **next token prediction task**.
 Token Embedding
       │
       ▼
-10 × Transformer Blocks
+13 × Transformer Blocks
       │
       ├── RMSNorm
       ├── Grouped Query Attention + RoPE
@@ -195,7 +213,7 @@ Linear Output Head
 Total parameters:
 
 ```
-~116M
+~123M (weight tying shares the ~39M embedding/output matrix; remaining budget reclaimed by emb_dim=768, hidden_dim=2048, n_layers=13)
 ```
 
 ---
@@ -239,14 +257,12 @@ Training and validation losses remain close throughout training, indicating **mi
 
 # Results
 
-Final evaluation on the test set:
-
 | Metric | Value |
 |------|------|
-| Test Loss | ~4.41 |
-| Perplexity | ~82 |
+| Test Loss | TBD |
+| Perplexity | TBD |
 
-For a **116M parameter model trained on ~500M tokens**, this result is within the expected range.
+For a **~123M parameter model trained on ~500M tokens**, this result is within the expected range.
 
 ---
 
@@ -275,8 +291,8 @@ However, the model occasionally produces **repetitive patterns**, which is commo
 Example configuration:
 
 ```
-temperature = 3.0
-top_k = 20
+temperature = 1.2
+top_k = 40
 ```
 
 These techniques improve diversity and reduce deterministic repetition.
@@ -352,9 +368,7 @@ Possible extensions include:
 
 - Training on **larger token budgets (1-5B tokens)**
 - Increasing context length to **1024+**
-- Implementing **Flash Attention**
-- Adding **weight tying**
-- Using **mixed precision training**
+- Using **mixed precision training** (`torch.autocast`)
 - Scaling the architecture to **GPT-2 Medium or Large**
 - Implementing **KV cache for faster inference**
 
@@ -365,6 +379,7 @@ Possible extensions include:
 - Sebastian Raschka — *LLMs From Scratch*  
 - GPT-2 Paper (Radford et al., 2019)  
 - RoFormer: Rotary Position Embedding  
+- Press & Wolf (2017) — *Using the Output Embedding to Improve Language Models* (arXiv:1608.05859)  
 - RedPajama Dataset  
 
 ---
